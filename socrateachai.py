@@ -1,8 +1,6 @@
 import streamlit as st
-from pydantic import BaseModel
-from typing import List
-import google.generativeai as genai
 from PIL import Image
+import google.generativeai as genai
 
 class SocraticTeachingAssistant:
     def __init__(self):
@@ -176,15 +174,14 @@ def streamlit_app():
     # Initialize session state
     if 'messages' not in st.session_state:
         st.session_state.messages = []
-
     if 'conversation_active' not in st.session_state:
         st.session_state.conversation_active = False
-
     if 'difficulty' not in st.session_state:
         st.session_state.difficulty = "medium"
-
     if 'mode' not in st.session_state:
         st.session_state.mode = "Socratic"
+    if 'selected_topic' not in st.session_state:
+        st.session_state.selected_topic = None
 
     # Function to start a new conversation
     def start_new_conversation():
@@ -192,24 +189,26 @@ def streamlit_app():
         st.session_state.conversation_active = False
         st.session_state.difficulty = "medium"
         st.session_state.mode = "Socratic"
+        st.session_state.selected_topic = None
         assistant.end_conversation()  # Reset the assistant's state
 
-    # Sidebar for topic selection, difficulty, and conversation control
-    with st.sidebar:
-        if not api_key:
-            st.error("Please enter your Gemini API Key to start.")
-        elif not st.session_state.conversation_active:
-            st.subheader("Start a New Conversation")
-            topics = list(assistant.knowledge_base.keys())
-            selected_topic = st.selectbox("Choose a topic:", topics)
-            difficulty = st.select_slider("Select difficulty:", options=["easy", "medium", "hard"], value="medium")
-            if st.button("Start Conversation"):
-                response = assistant.start_conversation(selected_topic, api_key, difficulty)
+    # Topic selection in main area
+    if not st.session_state.conversation_active:
+        topics = list(assistant.knowledge_base.keys())
+        selected_topic = st.selectbox("Choose a topic:", [""] + topics)
+        if selected_topic and selected_topic != st.session_state.selected_topic:
+            st.session_state.selected_topic = selected_topic
+            if api_key:
+                response = assistant.start_conversation(selected_topic, api_key, st.session_state.difficulty)
                 st.session_state.messages.append(("assistant", response))
                 st.session_state.conversation_active = True
-                st.session_state.difficulty = difficulty
                 st.rerun()
-        else:
+            else:
+                st.error("Please enter your Gemini API Key to start.")
+
+    # Sidebar for difficulty and conversation control
+    with st.sidebar:
+        if st.session_state.conversation_active:
             st.subheader("Conversation Settings")
             new_difficulty = st.select_slider("Adjust difficulty:", options=["easy", "medium", "hard"], value=st.session_state.difficulty)
             if new_difficulty != st.session_state.difficulty:
@@ -235,7 +234,7 @@ def streamlit_app():
                 st.session_state.conversation_active = False
                 st.rerun()
 
-    # Mode selection and explanation (outside the sidebar)
+    # Mode selection and explanation
     if st.session_state.conversation_active:
         st.subheader("Interaction Mode")
         col1, col2 = st.columns(2)
