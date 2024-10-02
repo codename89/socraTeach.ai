@@ -37,7 +37,8 @@ This project aims to provide a scalable, personalized learning experience for co
    ```
 
 4. Set up your Google Cloud credentials:
-   - Go to the Google Cloud Console
+   - Go to the Google AI Studio and sign in to gemini
+   - Click get API KEY
    - Create a new project or select an existing one
    - Enable the Gemini API for your project
    - Create an API key and note it down
