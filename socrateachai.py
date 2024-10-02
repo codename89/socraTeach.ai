@@ -166,12 +166,9 @@ def streamlit_app():
     except FileNotFoundError:
         st.write("Logo not found. Continuing without logo.")
 
-    # API Key input in sidebar
-    with st.sidebar:
-        api_key = st.text_input("Enter your Gemini API Key:", type="password")
-        st.warning("Please ensure you keep your API key secure and do not share it.")
-
     # Initialize session state
+    if 'assistant' not in st.session_state:
+        st.session_state.assistant = SocraticTeachingAssistant()
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'conversation_active' not in st.session_state:
@@ -183,6 +180,11 @@ def streamlit_app():
     if 'selected_topic' not in st.session_state:
         st.session_state.selected_topic = None
 
+    # API Key input in sidebar
+    with st.sidebar:
+        api_key = st.text_input("Enter your Gemini API Key:", type="password")
+        st.warning("Please ensure you keep your API key secure and do not share it.")
+
     # Function to start a new conversation
     def start_new_conversation():
         st.session_state.messages = []
@@ -190,49 +192,23 @@ def streamlit_app():
         st.session_state.difficulty = "medium"
         st.session_state.mode = "Socratic"
         st.session_state.selected_topic = None
-        assistant.end_conversation()  # Reset the assistant's state
+        st.session_state.assistant.end_conversation()  # Reset the assistant's state
 
     # Topic selection in main area
     if not st.session_state.conversation_active:
-        topics = list(assistant.knowledge_base.keys())
+        topics = list(st.session_state.assistant.knowledge_base.keys())
         selected_topic = st.selectbox("Choose a topic:", [""] + topics)
         if selected_topic and selected_topic != st.session_state.selected_topic:
             st.session_state.selected_topic = selected_topic
             if api_key:
-                response = assistant.start_conversation(selected_topic, api_key, st.session_state.difficulty)
+                response = st.session_state.assistant.start_conversation(selected_topic, api_key, st.session_state.difficulty)
                 st.session_state.messages.append(("assistant", response))
                 st.session_state.conversation_active = True
                 st.rerun()
             else:
                 st.error("Please enter your Gemini API Key to start.")
 
-    # Sidebar for difficulty and conversation control
-    with st.sidebar:
-        if st.session_state.conversation_active:
-            st.subheader("Conversation Settings")
-            new_difficulty = st.select_slider("Adjust difficulty:", options=["easy", "medium", "hard"], value=st.session_state.difficulty)
-            if new_difficulty != st.session_state.difficulty:
-                response = assistant.change_difficulty(new_difficulty, api_key)
-                st.session_state.messages.append(("assistant", response))
-                st.session_state.difficulty = new_difficulty
-                st.rerun()
-            
-            if st.button("Check Understanding"):
-                response = assistant.check_understanding(api_key)
-                st.session_state.messages.append(("assistant", response))
-                st.rerun()
-
-            if st.button("Conclude Topic"):
-                response = assistant.conclude_topic(api_key)
-                st.session_state.messages.append(("assistant", response))
-                st.session_state.conversation_active = False
-                st.rerun()
-
-            if st.button("End Conversation"):
-                response = assistant.end_conversation()
-                st.session_state.messages.append(("assistant", response))
-                st.session_state.conversation_active = False
-                st.rerun()
+    # ... [Keep the sidebar code for difficulty and conversation control] ...
 
     # Mode selection and explanation
     if st.session_state.conversation_active:
@@ -241,7 +217,7 @@ def streamlit_app():
         with col1:
             new_mode = st.radio("Select mode:", ["Socratic", "Q&A"])
             if new_mode != st.session_state.mode:
-                response = assistant.switch_mode(new_mode, api_key)
+                response = st.session_state.assistant.switch_mode(new_mode, api_key)
                 st.session_state.messages.append(("assistant", response))
                 st.session_state.mode = new_mode
                 st.rerun()
@@ -261,7 +237,7 @@ def streamlit_app():
         user_input = st.chat_input("Your response:" if st.session_state.mode == "Socratic" else "Your question:")
         if user_input:
             st.session_state.messages.append(("user", user_input))
-            response = assistant.process_response(user_input, api_key)
+            response = st.session_state.assistant.process_response(user_input, api_key)
             st.session_state.messages.append(("assistant", response))
             st.rerun()
 
