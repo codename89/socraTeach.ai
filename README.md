@@ -66,3 +66,6 @@ This project aims to provide a scalable, personalized learning experience for co
 - You may need to adjust the `BASE_URL` in `frontend.py` if you're running the backend on a different port or host.
 
 Enjoy learning with your Socratic Teaching Assistant!
+
+### Authorship
+This project, "Socratic Teaching Assistant for Data Structures and Algorithms," was developed by codename89.
