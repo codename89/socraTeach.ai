@@ -1,7 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
 
-
 class SocraticTeachingAssistant:
     def __init__(self):
         self.knowledge_base = self.init_knowledge_base()
@@ -55,7 +54,7 @@ class SocraticTeachingAssistant:
 
     def process_response(self, message):
         if not self.chat_session:
-            return "No active conversation. Please start a new conversation."
+            return "Please start a conversation first by choosing a topic."
 
         response = self.chat_session.send_user_message(message)
 
@@ -78,6 +77,14 @@ class SocraticTeachingAssistant:
 st.title("Socratic Teaching Assistant")
 assistant = SocraticTeachingAssistant()
 
+# Initialize session state variables if not already
+if 'conversation_active' not in st.session_state:
+    st.session_state.conversation_active = False
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+if 'mode' not in st.session_state:
+    st.session_state.mode = "Socratic"
+
 # Sidebar: Select topic, difficulty, and API key
 st.sidebar.subheader("Conversation Settings")
 api_key = st.sidebar.text_input("Enter API key", type="password")
@@ -88,7 +95,7 @@ difficulty = st.sidebar.selectbox("Select difficulty", options=["easy", "medium"
 if st.sidebar.button("Start Conversation") and api_key:
     response = assistant.start_conversation(topic, api_key, difficulty)
     st.session_state.conversation_active = True
-    st.session_state.messages = [("assistant", response)]
+    st.session_state.messages.append(("assistant", response))
     st.session_state.mode = "Socratic"
 
 # Mode selection and explanation (outside the sidebar)
