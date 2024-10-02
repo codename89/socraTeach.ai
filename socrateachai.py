@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
+
 
 class SocraticTeachingAssistant:
     def __init__(self):
@@ -45,205 +45,87 @@ class SocraticTeachingAssistant:
         particularly in {topic}. Your goal is to help the student understand {topic}.
         Focus on concepts like: {', '.join(self.knowledge_base[topic])}.
         The current difficulty level is set to {difficulty}. Adjust your explanations accordingly.
-        For 'easy', use simpler terms and basic concepts. For 'medium', introduce more complex ideas.
-        For 'hard', challenge the student with advanced concepts and edge cases.
-        The current mode is {self.mode}. In Socratic mode, guide through questions. In Q&A mode, provide direct answers.
-        Start by asking what the student already knows about {topic}, keeping in mind the {difficulty} difficulty level.
+        For 'easy', use simpler terms and basic concepts. For 'medium', introduce more detailed explanations. 
+        For 'hard', delve into complex details and edge cases.
         """
 
-        response = self.chat_session.send_message(system_prompt)
-        return response.text
+        self.chat_session.send_system_message(system_prompt)
 
-    def process_response(self, user_input):
+        return "Conversation started! Let's dive into the topic."
+
+    def process_response(self, message):
         if not self.chat_session:
-            return "Please start a conversation first by choosing a topic."
+            return "No active conversation. Please start a new conversation."
+
+        response = self.chat_session.send_user_message(message)
 
         if self.mode == "Socratic":
-            prompt = f"""
-            The student's response was: "{user_input}"
-            Analyze their understanding and formulate a Socratic question to deepen their knowledge 
-            of {self.current_topic}. Remember to guide them towards understanding rather than 
-            providing direct answers. If they seem confused, break down the concept further.
-            If they show understanding, challenge them with a more advanced aspect of {self.current_topic}.
-            Keep in mind that the current difficulty level is {self.difficulty}.
-            For 'easy', use simpler terms and focus on basic concepts.
-            For 'medium', introduce more complex ideas and terminology.
-            For 'hard', challenge the student with advanced concepts, edge cases, and deeper analysis.
-            """
-        else:  # Q&A mode
-            prompt = f"""
-            The student's question was: "{user_input}"
-            Provide a clear, concise, and direct answer about {self.current_topic}. 
-            If the question asks for code, include a relevant code snippet.
-            Do not use the Socratic method or ask the student to think about the process themselves.
-            If the question is not directly related to {self.current_topic}, provide a brief answer 
-            and gently redirect to the current topic.
-            Keep in mind that the current difficulty level is {self.difficulty}.
-            """
-
-        response = self.chat_session.send_message(prompt)
-        return response.text
-
-    def change_difficulty(self, new_difficulty):
-        if new_difficulty not in ["easy", "medium", "hard"]:
-            return "Invalid difficulty level. Please choose 'easy', 'medium', or 'hard'."
-
-        self.difficulty = new_difficulty
-        prompt = f"""
-        The difficulty level has been changed to {new_difficulty}. Adjust your teaching approach accordingly.
-        For 'easy', use simpler terms and focus on basic concepts.
-        For 'medium', introduce more complex ideas and terminology.
-        For 'hard', challenge the student with advanced concepts, edge cases, and deeper analysis.
-        Inform the student about the change and ask an appropriate question to continue the lesson at the new difficulty level.
-        """
-
-        response = self.chat_session.send_message(prompt)
-        return response.text
+            return f"Asking a guiding question: {response}"
+        elif self.mode == "Q&A":
+            return f"Answering the question: {response}"
 
     def switch_mode(self, new_mode):
         self.mode = new_mode
-        prompt = f"""
-        The conversation mode has been switched to {new_mode} mode.
-        For Socratic mode, use questions to guide the student's learning about {self.current_topic}.
-        For Q&A mode, provide direct and concise answers about {self.current_topic}.
-        Respond with an appropriate message to acknowledge the mode change and set the tone for the new mode.
-        """
-        response = self.chat_session.send_message(prompt)
-        return response.text
-
-    def check_understanding(self):
-        prompt = f"""
-        Based on the conversation so far about {self.current_topic}, provide the following:
-        1. A brief summary (2-3 sentences) of what we've discussed and the main concepts covered.
-        2. An assessment of the student's current understanding, noting any areas of strength or confusion.
-        3. A question or set of options for the student to choose from, such as:
-        a) Would you like to dive deeper into any specific aspect of {self.current_topic}?
-        b) Are you ready to move on to a related topic? If so, I can suggest some options.
-        c) Do you feel you've grasped the main concepts and want to conclude this topic?
-        d) Are there any parts of {self.current_topic} you'd like me to explain differently?
-        
-        Present this information clearly and concisely, maintaining a supportive and encouraging tone.
-        """
-        response = self.chat_session.send_message(prompt)
-        return response.text
-
-    def conclude_topic(self):
-        prompt = f"""
-        Provide a concise summary of the key points discussed about {self.current_topic}.
-        Highlight the main concepts learned, any problem-solving strategies introduced, and suggestions for further study.
-        End with an encouraging message about applying this knowledge to real-world programming challenges.
-        """
-        response = self.chat_session.send_message(prompt)
-        return response.text
+        return f"Switched to {new_mode} mode."
 
     def end_conversation(self):
-        if not self.chat_session:
-            return "No active conversation to end."
-
-        self.current_topic = None
         self.chat_session = None
-        self.model = None
-        self.difficulty = "medium"  # Reset to default difficulty
-        self.mode = "Socratic"  # Reset to default mode
-        return "Thank you for the discussion. Is there anything else you'd like to explore?"
+        self.current_topic = None
+        return "Conversation ended."
 
-# Initialize the teaching assistant
+
+# Initialize Streamlit app
+st.title("Socratic Teaching Assistant")
 assistant = SocraticTeachingAssistant()
 
-# Streamlit UI
-st.set_page_config(page_title="Socratic Teaching Assistant", page_icon="🧑‍🏫")
+# Sidebar: Select topic, difficulty, and API key
+st.sidebar.subheader("Conversation Settings")
+api_key = st.sidebar.text_input("Enter API key", type="password")
+topic = st.sidebar.selectbox("Select a topic", options=["sorting", "searching", "data structures"])
+difficulty = st.sidebar.selectbox("Select difficulty", options=["easy", "medium", "hard"])
 
-# Load and display the logo
-logo = Image.open("logo.png")
-st.image(logo, width=200)
+# Button to start conversation
+if st.sidebar.button("Start Conversation") and api_key:
+    response = assistant.start_conversation(topic, api_key, difficulty)
+    st.session_state.conversation_active = True
+    st.session_state.messages = [("assistant", response)]
+    st.session_state.mode = "Socratic"
 
-st.title("Socratic Teaching Assistant")
-
-# Initialize session state
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
-
-if 'conversation_active' not in st.session_state:
-    st.session_state.conversation_active = False
-
-# API Key input in sidebar
-with st.sidebar:
-    api_key = st.text_input("Enter your Gemini API Key:", type="password")
-    st.warning("Please ensure you keep your API key secure and do not share it.")
-
-# Sidebar for topic selection, difficulty, and conversation control
-with st.sidebar:
-    if not api_key:
-        st.error("Please enter your Gemini API Key to start.")
-    elif not st.session_state.conversation_active:
-        st.subheader("Start a New Conversation")
-        topics = list(assistant.knowledge_base.keys())
-        selected_topic = st.selectbox("Choose a topic:", topics)
-        difficulty = st.select_slider("Select difficulty:", options=["easy", "medium", "hard"], value="medium")
-        if st.button("Start Conversation"):
-            response = assistant.start_conversation(selected_topic, api_key, difficulty)
-            st.session_state.messages.append(("assistant", response))
-            st.session_state.conversation_active = True
-            st.rerun()
-    else:
-        st.subheader("Conversation Settings")
-        new_difficulty = st.select_slider("Adjust difficulty:", options=["easy", "medium", "hard"], value=assistant.difficulty)
-        if new_difficulty != assistant.difficulty:
-            response = assistant.change_difficulty(new_difficulty)
-            st.session_state.messages.append(("assistant", response))
-            st.rerun()
-        
-        if st.button("Check Understanding"):
-            response = assistant.check_understanding()
-            st.session_state.messages.append(("assistant", response))
-            st.rerun()
-
-        if st.button("Conclude Topic"):
-            response = assistant.conclude_topic()
-            st.session_state.messages.append(("assistant", response))
-            st.session_state.conversation_active = False
-            st.rerun()
-
-        if st.button("End Conversation"):
-            response = assistant.end_conversation()
-            st.session_state.messages.append(("assistant", response))
-            st.session_state.conversation_active = False
-            st.rerun()
-
-# Mode selection and explanation
-if st.session_state.conversation_active:
+# Mode selection and explanation (outside the sidebar)
+if st.session_state.get("conversation_active"):
     st.subheader("Interaction Mode")
     col1, col2 = st.columns(2)
     with col1:
         new_mode = st.radio("Select mode:", ["Socratic", "Q&A"])
-        if new_mode != assistant.mode:
+        if new_mode != st.session_state.get("mode"):
             response = assistant.switch_mode(new_mode)
             st.session_state.messages.append(("assistant", response))
+            st.session_state.mode = new_mode
             st.rerun()
     with col2:
-        if assistant.mode == "Socratic":
+        if st.session_state.get("mode") == "Socratic":
             st.info("In Socratic mode, the assistant will guide you through learning using questions and prompts.")
         else:
             st.info("In Q&A mode, you can ask direct questions about the current topic, and the assistant will provide answers.")
 
 # Display conversation history
-for role, message in st.session_state.messages:
-    with st.chat_message(role):
-        st.write(message)
+if st.session_state.get("messages"):
+    for role, message in st.session_state.get("messages"):
+        with st.chat_message(role):
+            st.write(message)
 
 # User input
-if st.session_state.conversation_active and api_key:
-    user_input = st.chat_input("Your response:" if assistant.mode == "Socratic" else "Your question:")
+if st.session_state.get("conversation_active") and api_key:
+    user_input = st.chat_input("Your response:" if st.session_state.get("mode") == "Socratic" else "Your question:")
     if user_input:
         st.session_state.messages.append(("user", user_input))
-        response = assistant.process_response(user_input)
-        st.session_state.messages.append(("assistant", response))
+        assistant_response = assistant.process_response(user_input)
+        st.session_state.messages.append(("assistant", assistant_response))
         st.rerun()
 
 # Option to start a new conversation
-if st.session_state.conversation_active:
+if st.session_state.get("conversation_active"):
     if st.button("Start New Conversation"):
-        assistant.end_conversation()
-        st.session_state.messages = []
         st.session_state.conversation_active = False
+        st.session_state.messages = []
         st.rerun()
