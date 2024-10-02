@@ -1,25 +1,8 @@
 import streamlit as st
-import asyncio
-import threading
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import google.generativeai as genai
 from PIL import Image
-
-# FastAPI app
-app = FastAPI()
-
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class SocraticTeachingAssistant:
     def __init__(self):
@@ -174,81 +157,16 @@ class SocraticTeachingAssistant:
 # Global instance of the assistant
 assistant = SocraticTeachingAssistant()
 
-class TopicRequest(BaseModel):
-    topic: str
-    api_key: str
-    difficulty: str = "medium"
-
-class MessageRequest(BaseModel):
-    message: str
-    api_key: str
-
-class DifficultyRequest(BaseModel):
-    difficulty: str
-    api_key: str
-
-class ApiKeyOnlyRequest(BaseModel):
-    api_key: str
-
-class ConversationResponse(BaseModel):
-    response: str
-
-@app.post("/start_conversation", response_model=ConversationResponse)
-async def start_conversation(request: TopicRequest):
-    response = assistant.start_conversation(request.topic, request.api_key, request.difficulty)
-    return ConversationResponse(response=response)
-
-@app.post("/process_response", response_model=ConversationResponse)
-async def process_response(request: MessageRequest):
-    if not assistant.current_topic:
-        raise HTTPException(status_code=400, detail="No active conversation. Please start a conversation first.")
-    response = assistant.process_response(request.message, request.api_key)
-    return ConversationResponse(response=response)
-
-@app.post("/change_difficulty", response_model=ConversationResponse)
-async def change_difficulty(request: DifficultyRequest):
-    if not assistant.current_topic:
-        raise HTTPException(status_code=400, detail="No active conversation. Please start a conversation first.")
-    response = assistant.change_difficulty(request.difficulty, request.api_key)
-    return ConversationResponse(response=response)
-
-@app.post("/switch_mode", response_model=ConversationResponse)
-async def switch_mode(request: MessageRequest):
-    if not assistant.current_topic:
-        raise HTTPException(status_code=400, detail="No active conversation. Please start a conversation first.")
-    response = assistant.switch_mode(request.message, request.api_key)
-    return ConversationResponse(response=response)
-
-@app.post("/check_understanding", response_model=ConversationResponse)
-async def check_understanding(request: ApiKeyOnlyRequest):
-    if not assistant.current_topic:
-        raise HTTPException(status_code=400, detail="No active conversation.")
-    response = assistant.check_understanding(request.api_key)
-    return ConversationResponse(response=response)
-
-@app.post("/conclude_topic", response_model=ConversationResponse)
-async def conclude_topic(request: ApiKeyOnlyRequest):
-    if not assistant.current_topic:
-        raise HTTPException(status_code=400, detail="No active conversation.")
-    response = assistant.conclude_topic(request.api_key)
-    return ConversationResponse(response=response)
-
-@app.post("/end_conversation", response_model=ConversationResponse)
-async def end_conversation():
-    response = assistant.end_conversation()
-    return ConversationResponse(response=response)
-
-@app.get("/available_topics", response_model=List[str])
-async def get_available_topics():
-    return list(assistant.knowledge_base.keys())
-
 # Streamlit UI
 def streamlit_app():
     st.title("Socratic Teaching Assistant")
 
     # Load and display the logo
-    logo = Image.open("logo.png")
-    st.image(logo, width=200)
+    try:
+        logo = Image.open("logo.png")
+        st.image(logo, width=200)
+    except FileNotFoundError:
+        st.write("Logo not found. Continuing without logo.")
 
     # API Key input in sidebar
     with st.sidebar:
@@ -274,6 +192,7 @@ def streamlit_app():
         st.session_state.conversation_active = False
         st.session_state.difficulty = "medium"
         st.session_state.mode = "Socratic"
+        assistant.end_conversation()  # Reset the assistant's state
 
     # Sidebar for topic selection, difficulty, and conversation control
     with st.sidebar:
@@ -281,37 +200,38 @@ def streamlit_app():
             st.error("Please enter your Gemini API Key to start.")
         elif not st.session_state.conversation_active:
             st.subheader("Start a New Conversation")
-            topics = asyncio.run(get_available_topics())
+            topics = list(assistant.knowledge_base.keys())
             selected_topic = st.selectbox("Choose a topic:", topics)
             difficulty = st.select_slider("Select difficulty:", options=["easy", "medium", "hard"], value="medium")
             if st.button("Start Conversation"):
-                response = asyncio.run(start_conversation(TopicRequest(topic=selected_topic, api_key=api_key, difficulty=difficulty)))
-                st.session_state.messages.append(("assistant", response.response))
+                response = assistant.start_conversation(selected_topic, api_key, difficulty)
+                st.session_state.messages.append(("assistant", response))
                 st.session_state.conversation_active = True
                 st.session_state.difficulty = difficulty
+                st.rerun()
         else:
             st.subheader("Conversation Settings")
             new_difficulty = st.select_slider("Adjust difficulty:", options=["easy", "medium", "hard"], value=st.session_state.difficulty)
             if new_difficulty != st.session_state.difficulty:
-                response = asyncio.run(change_difficulty(DifficultyRequest(difficulty=new_difficulty, api_key=api_key)))
-                st.session_state.messages.append(("assistant", response.response))
+                response = assistant.change_difficulty(new_difficulty, api_key)
+                st.session_state.messages.append(("assistant", response))
                 st.session_state.difficulty = new_difficulty
                 st.rerun()
             
             if st.button("Check Understanding"):
-                response = asyncio.run(check_understanding(ApiKeyOnlyRequest(api_key=api_key)))
-                st.session_state.messages.append(("assistant", response.response))
+                response = assistant.check_understanding(api_key)
+                st.session_state.messages.append(("assistant", response))
                 st.rerun()
 
             if st.button("Conclude Topic"):
-                response = asyncio.run(conclude_topic(ApiKeyOnlyRequest(api_key=api_key)))
-                st.session_state.messages.append(("assistant", response.response))
+                response = assistant.conclude_topic(api_key)
+                st.session_state.messages.append(("assistant", response))
                 st.session_state.conversation_active = False
                 st.rerun()
 
             if st.button("End Conversation"):
-                response = asyncio.run(end_conversation())
-                st.session_state.messages.append(("assistant", response.response))
+                response = assistant.end_conversation()
+                st.session_state.messages.append(("assistant", response))
                 st.session_state.conversation_active = False
                 st.rerun()
 
@@ -322,8 +242,8 @@ def streamlit_app():
         with col1:
             new_mode = st.radio("Select mode:", ["Socratic", "Q&A"])
             if new_mode != st.session_state.mode:
-                response = asyncio.run(switch_mode(MessageRequest(message=new_mode, api_key=api_key)))
-                st.session_state.messages.append(("assistant", response.response))
+                response = assistant.switch_mode(new_mode, api_key)
+                st.session_state.messages.append(("assistant", response))
                 st.session_state.mode = new_mode
                 st.rerun()
         with col2:
@@ -342,8 +262,8 @@ def streamlit_app():
         user_input = st.chat_input("Your response:" if st.session_state.mode == "Socratic" else "Your question:")
         if user_input:
             st.session_state.messages.append(("user", user_input))
-            response = asyncio.run(process_response(MessageRequest(message=user_input, api_key=api_key)))
-            st.session_state.messages.append(("assistant", response.response))
+            response = assistant.process_response(user_input, api_key)
+            st.session_state.messages.append(("assistant", response))
             st.rerun()
 
     # Option to start a new conversation
@@ -352,13 +272,5 @@ def streamlit_app():
             start_new_conversation()
             st.rerun()
 
-def run_fastapi():
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
 if __name__ == "__main__":
-    # Run FastAPI in a separate thread
-    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
-    fastapi_thread.start()
-
-    # Run Streamlit app
     streamlit_app()
