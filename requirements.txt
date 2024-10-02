@@ -1,0 +1,5 @@
+fastapi
+uvicorn google-generativeai
+streamlit
+google-generativeai
+pillow
