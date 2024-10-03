@@ -184,6 +184,7 @@ def streamlit_app():
     with st.sidebar:
         api_key = st.text_input("Enter your Gemini API Key:", type="password")
         st.warning("Please ensure you keep your API key secure and do not share it.")
+        st.warning("This version has encountered deployment issues on Streamlit.io. For a more stable experience, please refer to the GitHub repository, which includes a FastAPI-integrated version with Streamlit. However, some features may be missing or limited in this version due to the transition between frameworks.")
 
     # Function to start a new conversation
     def start_new_conversation():
@@ -208,8 +209,7 @@ def streamlit_app():
             else:
                 st.error("Please enter your Gemini API Key to start.")
 
-    # ... [Keep the sidebar code for difficulty and conversation control] ...
-
+    
     # Mode selection and explanation
     if st.session_state.conversation_active:
         st.subheader("Interaction Mode")
